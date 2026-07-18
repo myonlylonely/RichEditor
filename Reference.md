@@ -662,7 +662,7 @@ Shortcut=Ctrl+Shift+F
   - Cannot override built-in shortcuts (Ctrl+S, Ctrl+N, etc.)
 
 **Reserved Keyboard Shortcuts (Cannot Be Used):**
-- File: Ctrl+N, Ctrl+O, Ctrl+L, Ctrl+S (Open Resume File has no shortcut — use the File menu)
+- File: Ctrl+N, Ctrl+O, Ctrl+L, Ctrl+R, Ctrl+S (Open Resume File has no shortcut — use the File menu)
 - Edit: Ctrl+Z, Ctrl+Y, Ctrl+X, Ctrl+C, Ctrl+V, Ctrl+A
 - View: Ctrl+W
 - Tools: Ctrl+Enter, Ctrl+Shift+I, Ctrl+Shift+Q, Ctrl+Shift+T
@@ -1061,6 +1061,15 @@ Values: `typing`, `repl`, or both. Tables not listed are available for manual us
 - Implemented as a `script:` JScript expression (no external process); execution is instantaneous.
 - **Existing INI files are not updated automatically.** Users should replace their `[Filter8]` `Command=` with the new `script:` expression and update `Name=`, `Name.cs=`, `Description=`, `Description.cs=` to match the new defaults.
 
+**File → Reload (Ctrl+R):**
+
+- Re-reads the current document from disk, discarding any unsaved in-memory changes. Confirms before discarding when there are unsaved changes.
+- After reloading, the caret is restored to its previous line and column whenever possible — even if the file's content shifted (lines added/removed elsewhere) — using the same context-matching relocation the bookmark system already relies on. Falls back to a clamped raw position if the surrounding text can no longer be found at all.
+- Grayed out only for a document that has never been saved and has no recovery snapshot (nothing on disk to reload from).
+- **Resumed documents behave differently on purpose:** reloading a document recovered from a previous session (`[Resumed]` in the title) re-reads the session recovery temp file itself, not the original saved location. This discards any edits made *since* the recovery, reverting to the recovered snapshot — it does not touch or abandon the original file, and does not clear the resumed state. To load the clean, pre-crash version of the original file instead, use `File → Open` on that path directly.
+- Reloading a resumed document always shows a confirmation, even if the modified indicator is currently off — autosave can silently save a resumed document to its original location while intentionally leaving the recovery state active, so the recovery snapshot being reloaded could otherwise be replaced without any warning.
+- Flashes `[Reloaded]` in the status bar briefly after completing, mirroring the existing `[Autosaved]` flash (both are now localized, where previously the autosave flash text was hardcoded English only).
+
 ## Building
 
 ### Option 1: MSVC Build (Recommended for Windows) ✅
@@ -1309,6 +1318,7 @@ RichEditor.exe /readonly source.cpp
 | `Ctrl+N` | New file |
 | `Ctrl+O` | Open file |
 | `Ctrl+L` | Open Location (type a file or folder path) |
+| `Ctrl+R` | Reload current file from disk |
 | `Ctrl+S` | Save file |
 | `Ctrl+Z` | Undo |
 | `Ctrl+Y` | Redo |

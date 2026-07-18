@@ -47,6 +47,7 @@ RichEditor.exe "C:\Projects\MyApp"
 - New/Open/Save/Save As
 - **Open Location** (Ctrl+L): type a file or folder path directly; the editor opens the file, presets the Open dialog to the folder, or offers to correct a path that does not exist
 - **Open Resume File** (File menu): lists all session recovery files found in the recovery folder; opening one restores the `[Resumed]` state just as automatic startup recovery does; a **Delete all resume files** entry at the bottom clears the folder
+- **Reload** (Ctrl+R): re-reads the current file from disk, discarding unsaved changes after confirmation; restores the caret's line and column even if the file's content shifted. For a recovered (`[Resumed]`) document, reloads the recovery snapshot itself rather than the original file, discarding only edits made since recovery
 - Undo/Redo with descriptive labels
 - Word wrap toggle
 - Time/Date insertion (F5) with configurable templates

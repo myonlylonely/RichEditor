@@ -4,7 +4,7 @@ RichEditor is a lightweight, accessible Win32 text editor for plain text. It is 
 
 ## Quick Start
 
-Open and save like any classic editor: `File -> Open` (`Ctrl+O`) and `Ctrl+S`. Use `File -> Open Location` (`Ctrl+L`) to type a file or folder path directly — if you type a folder, the Open dialog appears preset to it; if the path does not exist, a warning appears and you can correct the path in the dialog. Toggle word wrap with `View -> Word Wrap` (`Ctrl+W`). Find, Replace, and Go to Line live under `Search` (`Ctrl+F`, `Ctrl+H`, `Ctrl+G`).
+Open and save like any classic editor: `File -> Open` (`Ctrl+O`) and `Ctrl+S`. Use `File -> Open Location` (`Ctrl+L`) to type a file or folder path directly — if you type a folder, the Open dialog appears preset to it; if the path does not exist, a warning appears and you can correct the path in the dialog. Use `File -> Reload` (`Ctrl+R`) to discard unsaved changes and re-read the current file from disk; the caret is restored to the same line and column whenever possible, even if the file changed underneath you. Toggle word wrap with `View -> Word Wrap` (`Ctrl+W`). Find, Replace, and Go to Line live under `Search` (`Ctrl+F`, `Ctrl+H`, `Ctrl+G`).
 
 ## UI Basics and Status Bar
 
@@ -67,6 +67,14 @@ If the recovery file cannot be reached at startup (for example, if the editor is
 **File → Open Resume File** lists all recovery files found in the recovery folder. Selecting one opens it with the same `[Resumed]` state as automatic recovery — `Ctrl+S` opens a Save As dialog since the original path is not known for files opened this way. The **Delete all resume files** entry at the bottom of the submenu permanently removes all files in the recovery folder.
 
 Advanced: `AutoSaveUntitledOnClose=1` saves untitled work on close without prompting.
+
+## Reload
+
+`File -> Reload` (`Ctrl+R`) re-reads the current file from disk, discarding unsaved changes. If there are unsaved changes, a confirmation is shown first. The caret is restored to the same line and column afterward whenever possible, even if the file's content changed — RichEditor searches for the surrounding text near the old position (and, if needed, anywhere in the document) rather than relying on a raw character count that could now point somewhere else entirely. A brief `[Reloaded]` message flashes in the status bar when done.
+
+Reload is unavailable only for a document that has never been saved and has no recovery snapshot to fall back on.
+
+For a document recovered from a previous session (`[Resumed]` in the title), Reload behaves differently on purpose: it re-reads the *recovery snapshot itself*, not the original file at its saved location. This discards only the edits made since recovery, reverting to the state RichEditor recovered — it does not touch the original file and the document remains marked `[Resumed]` afterward. This always asks for confirmation, even if the document currently shows no unsaved changes, since autosave can save a resumed document's content to its original location while intentionally keeping the recovery state active — reloading in that state could otherwise silently revert to an older snapshot. To load the clean, pre-crash version of the original file instead, use `File -> Open` on that path directly.
 
 ## Read-Only Mode
 
@@ -346,6 +354,7 @@ Note: `/elevated-save` is used internally by the editor when retrying a save wit
 | Ctrl+N | New |
 | Ctrl+O | Open |
 | Ctrl+L | Open Location (type a file or folder path) |
+| Ctrl+R | Reload current file from disk |
 | Ctrl+S | Save |
 | Ctrl+Z | Undo |
 | Ctrl+Y | Redo |
