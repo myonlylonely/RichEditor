@@ -19,6 +19,7 @@ BEGIN
         MENUITEM "&Open...\tCtrl+O", ID_FILE_OPEN
         MENUITEM "Open &Location...\tCtrl+L", ID_FILE_OPENLOCATION
         MENUITEM "Open Resume &File", ID_FILE_OPENRESUME
+        MENUITEM "Reloa&d\tCtrl+R", ID_FILE_RELOAD
         MENUITEM SEPARATOR
         MENUITEM "&Read-Only", ID_FILE_READONLY
         MENUITEM SEPARATOR
@@ -363,6 +364,11 @@ BEGIN
       IDS_MENU_OPENRESUME             "Open Resume &File"
       IDS_OPENRESUME_CLEAR            "Delete all resume files"
       IDS_RESUME_TEMPDIR_FAIL         "Could not create or access the session recovery folder:\n\n{PATH}"
+      IDS_RELOAD_CONFIRM_NORMAL       "Reload discards unsaved changes and reloads the file from disk. Continue?"
+      IDS_RELOAD_CONFIRM_RESUMED      "This document was recovered from a previous session and has not been saved. Reloading will discard the recovered content and load the last saved recovery snapshot. Continue?"
+      IDS_RELOADED_FLASH              "[Reloaded]"
+      IDS_AUTOSAVED_FLASH             "[Autosaved]"
+      IDS_RELOAD_NO_RESUME_FILE       "No recovery file is available to reload. Use File -> Open to load the file directly."
 END
 // ============================================================================
 LANGUAGE LANG_CZECH, SUBLANG_DEFAULT
@@ -376,6 +382,7 @@ BEGIN
         MENUITEM "&Otevřít...\tCtrl+O", ID_FILE_OPEN
         MENUITEM "Otevřít u&místění...\tCtrl+L", ID_FILE_OPENLOCATION
         MENUITEM "Otevřít soubor &obnovení", ID_FILE_OPENRESUME
+        MENUITEM "Načíst &znovu\tCtrl+R", ID_FILE_RELOAD
         MENUITEM SEPARATOR
         MENUITEM "&Pouze ke čtení", ID_FILE_READONLY
         MENUITEM SEPARATOR
@@ -674,4 +681,9 @@ BEGIN
       IDS_MENU_OPENRESUME             "Otevřít soubor &obnovení"
       IDS_OPENRESUME_CLEAR            "Smazat všechny soubory obnovení"
       IDS_RESUME_TEMPDIR_FAIL         "Nelze vytvořit nebo zpřístupnit složku pro obnovení relace:\n\n{PATH}"
+      IDS_RELOAD_CONFIRM_NORMAL       "Načtení znovu zahodí neuložené změny a znovu načte soubor z disku. Pokračovat?"
+      IDS_RELOAD_CONFIRM_RESUMED      "Tento dokument byl obnoven z předchozí relace a nebyl uložen. Načtení znovu zahodí obnovený obsah a načte poslední uložený snímek obnovy. Pokračovat?"
+      IDS_RELOADED_FLASH              "[Načteno znovu]"
+      IDS_AUTOSAVED_FLASH             "[Automaticky uloženo]"
+      IDS_RELOAD_NO_RESUME_FILE       "Není k dispozici žádný soubor obnovení k načtení. Použijte Soubor -> Otevřít pro přímé načtení souboru."
 END

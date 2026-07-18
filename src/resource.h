@@ -17,6 +17,7 @@
 #define ID_FILE_OPEN                    1003
 #define ID_FILE_OPENLOCATION            1008  // Open Location... (file or folder path, Ctrl+L)
 #define ID_FILE_OPENRESUME              1009  // Open Resume File submenu parent
+#define ID_FILE_RELOAD                  1010  // Reload current file from disk (Ctrl+R)
 #define ID_FILE_SAVE                    1004
 #define ID_FILE_SAVEAS                  1005
 #define ID_FILE_READONLY                1006  // Toggle read-only mode
@@ -303,5 +304,12 @@
 #define IDS_MENU_OPENRESUME             2195  // "Open Resume File" menu label (for grayed state)
 #define IDS_OPENRESUME_CLEAR            2196  // "Delete all resume files" submenu item
 #define IDS_RESUME_TEMPDIR_FAIL         2197  // Error when recovery folder cannot be created/accessed
+
+// Reload feature strings (2198-2201)
+#define IDS_RELOAD_CONFIRM_NORMAL       2198  // Confirmation text for a normal modified file
+#define IDS_RELOAD_CONFIRM_RESUMED      2199  // Confirmation text for a resumed file
+#define IDS_RELOADED_FLASH              2200  // "[Reloaded]" status bar flash text
+#define IDS_AUTOSAVED_FLASH             2201  // "[Autosaved]" status bar flash text
+#define IDS_RELOAD_NO_RESUME_FILE       2202  // Shown if g_bIsResumedFile is true but the resume path is empty
 
 #endif // RESOURCE_H

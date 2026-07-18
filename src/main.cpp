@@ -297,6 +297,7 @@ const ReservedShortcut g_ReservedShortcuts[] = {
     { 'O', FCONTROL | FVIRTKEY, L"Ctrl+O (Open)" },
     { 'L', FCONTROL | FVIRTKEY, L"Ctrl+L (Open Location)" },
     { 'S', FCONTROL | FVIRTKEY, L"Ctrl+S (Save)" },
+    { 'R', FCONTROL | FVIRTKEY, L"Ctrl+R (Reload)" },
     { 'Z', FCONTROL | FVIRTKEY, L"Ctrl+Z (Undo)" },
     { 'Y', FCONTROL | FVIRTKEY, L"Ctrl+Y (Redo)" },
     { 'X', FCONTROL | FVIRTKEY, L"Ctrl+X (Cut)" },
@@ -511,7 +512,8 @@ LONG  g_nREPLSyncPos = -1;              // Editor pos up to which child received
 // Status bar filter display
 WCHAR g_szFilterStatusBarText[512] = L"";
 BOOL g_bFilterStatusBarActive = FALSE;
-WCHAR g_szAutosaveFlashPrevStatus[512] = L"";  // Status text saved before "[Autosaved]" flash
+WCHAR g_szAutosaveFlashPrevStatus[512] = L"";  // Status text saved before a status bar flash
+BOOL g_bStatusFlashActive = FALSE;  // TRUE while a flash timer is pending (avoid stomping saved text)
 
 //============================================================================
 // Addon System (Phase 2.14)
@@ -725,6 +727,7 @@ void BuildFileDialogFilter(LPWSTR pszFilter, DWORD cchFilter, int* pnFilterCount
 void FileOpen();
 BOOL FileSave();
 BOOL FileSaveAs();
+void FileReload();
 BOOL PromptSaveChanges();
 void EditUndo();
 void EditRedo();
@@ -754,6 +757,7 @@ void UpdateMenuStates(HWND hwnd);
 void BuildFilterMenu(HWND hwnd);
 void DoAutosave();
 void StartAutosaveTimer(HWND hwnd);
+void FlashStatusBarMessage(LPCWSTR pszText, UINT durationMs);
 void LoadMRU();
 void SaveMRU();
 void AddToMRU(LPCWSTR pszFilePath);
@@ -1553,7 +1557,7 @@ void LoadTemplates()
 HACCEL BuildAcceleratorTable()
 {
     // Count total accelerators needed
-    const int BUILTIN_COUNT = 25;  // Built-in shortcuts (including Open Location)
+    const int BUILTIN_COUNT = 26;  // Built-in shortcuts (including Open Location, Reload)
     int nTemplateShortcuts = 0;
     
     for (int i = 0; i < g_nTemplateCount; i++) {
@@ -1575,6 +1579,7 @@ HACCEL BuildAcceleratorTable()
     pAccel[idx].fVirt = FCONTROL | FVIRTKEY; pAccel[idx].key = 'O'; pAccel[idx++].cmd = ID_FILE_OPEN;
     pAccel[idx].fVirt = FCONTROL | FVIRTKEY; pAccel[idx].key = 'L'; pAccel[idx++].cmd = ID_FILE_OPENLOCATION;
     pAccel[idx].fVirt = FCONTROL | FVIRTKEY; pAccel[idx].key = 'S'; pAccel[idx++].cmd = ID_FILE_SAVE;
+    pAccel[idx].fVirt = FCONTROL | FVIRTKEY; pAccel[idx].key = 'R'; pAccel[idx++].cmd = ID_FILE_RELOAD;
     pAccel[idx].fVirt = FCONTROL | FVIRTKEY; pAccel[idx].key = 'Z'; pAccel[idx++].cmd = ID_EDIT_UNDO;
     pAccel[idx].fVirt = FCONTROL | FVIRTKEY; pAccel[idx].key = 'Y'; pAccel[idx++].cmd = ID_EDIT_REDO;
     pAccel[idx].fVirt = FCONTROL | FVIRTKEY; pAccel[idx].key = 'X'; pAccel[idx++].cmd = ID_EDIT_CUT;
@@ -3535,9 +3540,10 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
             if (wParam == IDT_AUTOSAVE) {
                 DoAutosave();
             }
-            // Handle "[Autosaved]" status bar flash — restore previous text
+            // Handle status bar flash restore (autosave / reload)
             else if (wParam == IDT_AUTOSAVE_FLASH) {
                 KillTimer(hwnd, IDT_AUTOSAVE_FLASH);
+                g_bStatusFlashActive = FALSE;
                 if (g_hWndStatus)
                     SendMessage(g_hWndStatus, SB_SETTEXT, 0, (LPARAM)g_szAutosaveFlashPrevStatus);
             }
@@ -3664,6 +3670,9 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
                     }
                     break;
                 }
+                case ID_FILE_RELOAD:
+                    FileReload();
+                    break;
                 case ID_FILE_READONLY:
                     g_bReadOnly = !g_bReadOnly;                    SendMessage(g_hWndEdit, EM_SETREADONLY, g_bReadOnly, 0);
                     BuildFilterMenu(hwnd);  // Rebuild filter menu to update grayed state
@@ -4024,6 +4033,11 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
                              g_bReadOnly ? MF_CHECKED : MF_UNCHECKED);
                 EnableMenuItem(hMenu, ID_FILE_SAVE, 
                               g_bReadOnly ? MF_GRAYED : MF_ENABLED);
+                // Reload needs a backing file: either a real path on disk, or
+                // (for a resumed document) the temp recovery file itself.
+                BOOL bCanReload = (g_szFileName[0] != L'\0') || g_bIsResumedFile;
+                EnableMenuItem(hMenu, ID_FILE_RELOAD,
+                              bCanReload ? MF_ENABLED : MF_GRAYED);
                 BuildResumeFilesMenu(hwnd);  // Refresh resume file list
             }
             // Update Undo/Redo menu items when Edit menu is opened
@@ -8812,6 +8826,128 @@ void FileOpen()
 }
 
 //============================================================================
+// FileReload - Reload the current document from disk, discarding unsaved
+// changes. For a normal file this re-reads g_szFileName. For a resumed
+// document (g_bIsResumedFile) it re-reads the resume temp file itself
+// (g_szResumeFilePath), not the original location — reload on a resumed
+// document means "discard edits made since recovery, revert to the
+// recovered/crash-time snapshot", not "abandon the recovery entirely".
+// Caret position is restored using the same context-based relocation the
+// bookmark system already uses, so it survives content shifting on disk.
+//============================================================================
+void FileReload()
+{
+    BOOL bCanReload = (g_szFileName[0] != L'\0') || g_bIsResumedFile;
+    if (!bCanReload) return;  // defensive; menu/accelerator already gate this
+
+    // Prompt whenever there are unsaved edits OR the document is resumed —
+    // a resumed document can have g_bModified==FALSE (autosave can clear it
+    // while intentionally leaving g_bIsResumedFile set), but the temp file
+    // being reloaded may still be stale relative to what's on screen, so the
+    // resumed case always warns regardless of the modified flag.
+    if (g_bModified || g_bIsResumedFile) {
+        WCHAR szMsg[512], szTitle[64];
+        LoadStringResource(IDS_CONFIRM, szTitle, 64);
+        LoadStringResource(g_bIsResumedFile ? IDS_RELOAD_CONFIRM_RESUMED
+                                             : IDS_RELOAD_CONFIRM_NORMAL,
+                            szMsg, 512);
+        if (MessageBox(g_hWndMain, szMsg, szTitle,
+                       MB_YESNO | MB_ICONWARNING) != IDYES) {
+            return;
+        }
+    }
+
+    // Capture the caret's line start + column offset (not the raw caret
+    // position) — GetLineContextFromCharPos and the bookmark-matching
+    // functions all anchor on line starts, matching how ToggleBookmark works.
+    CHARRANGE crBefore = RE_GetSel(g_hWndEdit);
+    LONG oldLineIndex = (LONG)SendMessage(g_hWndEdit, EM_EXLINEFROMCHAR, 0, crBefore.cpMin);
+    LONG oldLineStart = (LONG)SendMessage(g_hWndEdit, EM_LINEINDEX, oldLineIndex, 0);
+    LONG oldColumn = crBefore.cpMin - oldLineStart;
+    WCHAR szContext[BOOKMARK_CONTEXT_LEN];
+    GetLineContextFromCharPos(oldLineStart, szContext, BOOKMARK_CONTEXT_LEN);
+
+    // Persist any bookmarks toggled this session before LoadTextFile's
+    // internal LoadBookmarksForCurrentFile() clears/reloads them.
+    SaveBookmarksForCurrentFile();
+
+    BOOL bWasResumed = g_bIsResumedFile;
+    WCHAR szTargetPath[EXTENDED_PATH_MAX];
+    WCHAR szSavedFileName[EXTENDED_PATH_MAX];
+    WCHAR szSavedFileTitle[MAX_PATH];
+    WCHAR szSavedResumeFilePath[EXTENDED_PATH_MAX];
+    WCHAR szSavedOriginalFilePath[EXTENDED_PATH_MAX];
+
+    if (bWasResumed) {
+        if (g_szResumeFilePath[0] == L'\0') {
+            // Pre-existing gap: a cancelled shutdown can leave g_bIsResumedFile
+            // true with an empty resume path. Nothing valid to reload from.
+            WCHAR szMsg[256], szTitle[64];
+            LoadStringResource(IDS_ERROR, szTitle, 64);
+            LoadStringResource(IDS_RELOAD_NO_RESUME_FILE, szMsg, 256);
+            MessageBox(g_hWndMain, szMsg, szTitle, MB_OK | MB_ICONWARNING);
+            return;
+        }
+        // Reload from the resume temp file itself, not the original location.
+        // Preserve the display name / resume-state globals across LoadTextFile,
+        // which would otherwise overwrite them with the temp file's own path.
+        wcscpy_s(szTargetPath, EXTENDED_PATH_MAX, g_szResumeFilePath);
+        wcscpy_s(szSavedFileName, EXTENDED_PATH_MAX, g_szFileName);
+        wcscpy_s(szSavedFileTitle, MAX_PATH, g_szFileTitle);
+        wcscpy_s(szSavedResumeFilePath, EXTENDED_PATH_MAX, g_szResumeFilePath);
+        wcscpy_s(szSavedOriginalFilePath, EXTENDED_PATH_MAX, g_szOriginalFilePath);
+    } else {
+        wcscpy_s(szTargetPath, EXTENDED_PATH_MAX, g_szFileName);
+    }
+
+    if (LoadTextFile(szTargetPath, FALSE)) {
+        if (bWasResumed) {
+            wcscpy_s(g_szFileName, EXTENDED_PATH_MAX, szSavedFileName);
+            wcscpy_s(g_szFileTitle, MAX_PATH, szSavedFileTitle);
+            wcscpy_s(g_szResumeFilePath, EXTENDED_PATH_MAX, szSavedResumeFilePath);
+            wcscpy_s(g_szOriginalFilePath, EXTENDED_PATH_MAX, szSavedOriginalFilePath);
+            g_bIsResumedFile = TRUE;
+            g_bModified = TRUE;  // still an unsaved recovered document
+            // Extension was already correctly derived from the resume file's
+            // own name inside LoadTextFile; only recompute it from the real
+            // original name when one is known, otherwise leave it alone (an
+            // untitled resumed document has no original name to derive from).
+            if (szSavedFileName[0] != L'\0') {
+                UpdateFileExtension(szSavedFileName);
+            }
+            // g_szFileName is correct again now — re-read bookmarks for it,
+            // since LoadTextFile's internal load happened under the temp path.
+            LoadBookmarksForCurrentFile();
+            UpdateTitle();
+            UpdateStatusBar();
+        }
+
+        // Relocate the caret using the same fallback chain bookmarks use.
+        LONG newLineStart = oldLineStart;
+        if (!BookmarkContextMatchesAt(oldLineStart, szContext)) {
+            LONG found = FindContextNearPos(oldLineStart, szContext, 8192);
+            if (found < 0) found = FindContextInDocument(szContext);
+            if (found >= 0) {
+                newLineStart = found;
+            } else {
+                int newLen = GetWindowTextLength(g_hWndEdit);
+                if (newLineStart > newLen) newLineStart = newLen;
+            }
+        }
+        LONG newLineLength = (LONG)SendMessage(g_hWndEdit, EM_LINELENGTH, newLineStart, 0);
+        LONG clampedColumn = (oldColumn < newLineLength) ? oldColumn : newLineLength;
+        LONG finalPos = newLineStart + clampedColumn;
+        RE_SetSel(g_hWndEdit, finalPos, finalPos);
+        SendMessage(g_hWndEdit, EM_SCROLLCARET, 0, 0);
+        SetFocus(g_hWndEdit);
+
+        WCHAR szFlash[64];
+        LoadStringResource(IDS_RELOADED_FLASH, szFlash, 64);
+        FlashStatusBarMessage(szFlash, 1000);
+    }
+}
+
+//============================================================================
 // FileSave - Save current file (or show Save As if no filename)
 //============================================================================
 BOOL FileSave()
@@ -12631,6 +12767,24 @@ void StartAutosaveTimer(HWND hwnd)
 //============================================================================
 // DoAutosave - Perform autosave if file has been modified and has a name
 //============================================================================
+//============================================================================
+// FlashStatusBarMessage - Briefly show pszText in the status bar, restoring
+// the previous text after durationMs. Shared by autosave and Reload flashes.
+// If a flash is already in progress, the previously-saved text is kept as-is
+// (not overwritten with the currently-flashed text), so a second flash
+// firing before the first one expires doesn't lose the true original status.
+//============================================================================
+void FlashStatusBarMessage(LPCWSTR pszText, UINT durationMs)
+{
+    if (!g_hWndStatus) return;
+    if (!g_bStatusFlashActive) {
+        SendMessage(g_hWndStatus, SB_GETTEXT, 0, (LPARAM)g_szAutosaveFlashPrevStatus);
+        g_bStatusFlashActive = TRUE;
+    }
+    SendMessage(g_hWndStatus, SB_SETTEXT, 0, (LPARAM)pszText);
+    SetTimer(g_hWndMain, IDT_AUTOSAVE_FLASH, durationMs, NULL);
+}
+
 void DoAutosave()
 {
     // Only autosave if:
@@ -12663,11 +12817,9 @@ void DoAutosave()
         UpdateTitle();  // Remove asterisk from title bar
         
         // Flash "[Autosaved]" in status bar for 1 second without blocking the UI thread
-        if (g_hWndStatus) {
-            SendMessage(g_hWndStatus, SB_GETTEXT, 0, (LPARAM)g_szAutosaveFlashPrevStatus);
-            SendMessage(g_hWndStatus, SB_SETTEXT, 0, (LPARAM)L"[Autosaved]");
-            SetTimer(g_hWndMain, IDT_AUTOSAVE_FLASH, 1000, NULL);
-        }
+        WCHAR szFlash[64];
+        LoadStringResource(IDS_AUTOSAVED_FLASH, szFlash, 64);
+        FlashStatusBarMessage(szFlash, 1000);
     }
 
     g_bSaveInProgress = FALSE;
