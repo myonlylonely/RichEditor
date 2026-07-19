@@ -4,7 +4,7 @@ RichEditor je lehký a přístupný textový editor pro systém Windows (Win32, 
 
 ## Rychlý start
 
-Otevírejte a ukládejte jako v klasickém editoru: `Soubor -> Otevřít` (`Ctrl+O`) a `Ctrl+S`. Použijte `Soubor -> Otevřít umístění` (`Ctrl+L`) pro přímé zadání cesty k souboru nebo složce — zadáte-li složku, dialog Otevřít se zobrazí s předvolenou touto složkou; pokud cesta neexistuje, zobrazí se upozornění a cestu lze opravit přímo v dialogu. Použijte `Soubor -> Načíst znovu` (`Ctrl+R`) pro zahození neuložených změn a opětovné načtení aktuálního souboru z disku; kurzor se pokud možno vrátí na stejný řádek a sloupec, i když se obsah souboru mezitím změnil. Zalamování řádků přepnete v `Zobrazit -> Zalamování řádků` (`Ctrl+W`). Najít, nahradit a přejít na řádek najdete pod `Hledat` (`Ctrl+F`, `Ctrl+H`, `Ctrl+G`).
+Otevírejte a ukládejte jako v klasickém editoru: `Soubor -> Otevřít` (`Ctrl+O`) a `Ctrl+S`. Použijte `Soubor -> Otevřít umístění` (`Ctrl+L`) pro přímé zadání cesty k souboru nebo složce — zadáte-li složku, dialog Otevřít se zobrazí s předvolenou touto složkou; pokud cesta neexistuje, zobrazí se upozornění a cestu lze opravit přímo v dialogu. Použijte `Soubor -> Znovu načíst` (`Ctrl+R`) pro zahození neuložených změn a opětovné načtení aktuálního souboru z disku; kurzor se pokud možno vrátí na stejný řádek a sloupec, i když se obsah souboru mezitím změnil. Zalamování řádků přepnete v `Zobrazit -> Zalamování řádků` (`Ctrl+W`). Najít, nahradit a přejít na řádek najdete pod `Hledat` (`Ctrl+F`, `Ctrl+H`, `Ctrl+G`).
 
 ## Základy rozhraní a stavový řádek
 
@@ -68,13 +68,13 @@ Pokud soubor obnovení při spuštění není dostupný (například pokud je ed
 
 Pokročilé: `AutoSaveUntitledOnClose=1` uloží nepojmenovanou práci při zavření bez potvrzení.
 
-## Načíst znovu
+## Znovu načíst
 
-`Soubor -> Načíst znovu` (`Ctrl+R`) znovu načte aktuální soubor z disku a zahodí neuložené změny. Pokud existují neuložené změny, nejprve se zobrazí potvrzení. Kurzor se poté pokud možno vrátí na stejný řádek a sloupec, i když se obsah souboru změnil — RichEditor vyhledá okolní text poblíž původní pozice (a v případě potřeby kdekoli v dokumentu), místo aby se spoléhal na pouhý počet znaků, který by mohl nyní ukazovat jinam. Po dokončení se ve stavovém řádku krátce zobrazí zpráva `[Načteno znovu]`.
+`Soubor -> Znovu načíst` (`Ctrl+R`) znovu načte aktuální soubor z disku a zahodí neuložené změny. Pokud existují neuložené změny, nejprve se zobrazí potvrzení. Kurzor se poté pokud možno vrátí na stejný řádek a sloupec, i když se obsah souboru změnil — RichEditor vyhledá okolní text poblíž původní pozice (a v případě potřeby kdekoli v dokumentu), místo aby se spoléhal na pouhý počet znaků, který by mohl nyní ukazovat jinam. Po dokončení se ve stavovém řádku krátce zobrazí zpráva `[Znovu načteno]`.
 
-Načíst znovu je nedostupné pouze pro dokument, který nebyl nikdy uložen a nemá žádný snímek obnovy, ze kterého by bylo možné vycházet.
+Znovu načíst je nedostupné pouze pro dokument, který nebyl nikdy uložen a nemá žádný snímek obnovy, ze kterého by bylo možné vycházet.
 
-U dokumentu obnoveného z předchozí relace (`[Obnoveno]` v titulku) se Načíst znovu chová záměrně jinak: znovu načte přímo *snímek obnovy*, nikoli původní soubor na jeho uloženém místě. Tím se zahodí pouze úpravy provedené od obnovení, návratem do stavu, který RichEditor obnovil — původní soubor se nedotkne a dokument zůstane označen jako `[Obnoveno]`. Toto vždy vyžaduje potvrzení, i když dokument aktuálně nevykazuje žádné neuložené změny, protože automatické ukládání může uložit obsah obnoveného dokumentu na jeho původní místo a přitom záměrně ponechat stav obnovení aktivní — načtení znovu by v takovém stavu jinak mohlo tiše vrátit starší snímek. Pro načtení čisté verze původního souboru z doby před pádem použijte přímo `Soubor -> Otevřít` na dané cestě.
+U dokumentu obnoveného z předchozí relace (`[Obnoveno]` v titulku) se Znovu načíst chová záměrně jinak: znovu načte přímo *snímek obnovy*, nikoli původní soubor na jeho uloženém místě. Tím se zahodí pouze úpravy provedené od obnovení, návratem do stavu, který RichEditor obnovil — původní soubor se nedotkne a dokument zůstane označen jako `[Obnoveno]`. Toto vždy vyžaduje potvrzení, i když dokument aktuálně nevykazuje žádné neuložené změny, protože automatické ukládání může uložit obsah obnoveného dokumentu na jeho původní místo a přitom záměrně ponechat stav obnovení aktivní — znovu načíst by v takovém stavu jinak mohlo tiše vrátit starší snímek. Pro načtení čisté verze původního souboru z doby před pádem použijte přímo `Soubor -> Otevřít` na dané cestě.
 
 ## Režim pouze pro čtení
 
@@ -358,7 +358,7 @@ Názvy kláves jsou uvedeny podle popisků na klávesnici (Ctrl, Shift, Alt, Ent
 | Ctrl+N | Nový |
 | Ctrl+O | Otevřít |
 | Ctrl+L | Otevřít umístění (zadat cestu k souboru nebo složce) |
-| Ctrl+R | Načíst znovu aktuální soubor z disku |
+| Ctrl+R | Znovu načíst aktuální soubor z disku |
 | Ctrl+S | Uložit |
 | Ctrl+Z | Zpět |
 | Ctrl+Y | Znovu |
