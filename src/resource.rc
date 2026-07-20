@@ -391,7 +391,7 @@ BEGIN
         MENUITEM SEPARATOR
         MENUITEM "&Konec\tAlt+F4", ID_FILE_EXIT
     END
-    POPUP "Úp&ravy"
+    POPUP "Úpr&avy"
     BEGIN
         MENUITEM "&Zpět\tCtrl+Z", ID_EDIT_UNDO
         MENUITEM "Z&novu\tCtrl+Y", ID_EDIT_REDO
@@ -441,7 +441,7 @@ BEGIN
         MENUITEM SEPARATOR
         MENUITEM "Znovu načíst &doplňky", ID_TOOLS_RELOAD_ADDONS
     END
-    POPUP "&Nápověda"
+    POPUP "Nápo&věda"
     BEGIN
         MENUITEM "&O programu...", ID_HELP_ABOUT
     END
