@@ -23,6 +23,18 @@ This is the concise, current guide for contributors and AI agents. The detailed 
   messages, code comments, documentation, or any other artefact. Treat all examples as opaque
   illustrations only. Use generic placeholders (`C:\path\to\file`, `<unavailable path>`,
   `example.txt`, etc.) whenever a concrete path or name is needed for explanation.
+- **Watch cumulative stack usage of `EXTENDED_PATH_MAX` buffers:** each such local is ~64 KB, and
+  the codebase has dozens. The startup call chain alone nests enough of them to have exceeded
+  MSVC's default 1 MB stack reserve, crashing every launch of the MSVC build with an opaque WER
+  `STATUS_FATAL_APP_EXIT` (`0xc000041d`) — the escalated form of `STATUS_STACK_OVERFLOW` — while
+  the MinGW build survived only because its linker defaults to a 2 MB reserve. Both build systems
+  now pin an explicit 8 MB reserve (`/STACK:8388608` in `build_msvc.bat`, `-Wl,--stack,8388608` in
+  the Makefile); never remove those flags. Additionally, never declare a large local array directly
+  inside a `case` block of `WndProc`, a `DialogProc`, or a subclass proc — the whole frame is
+  reserved in the function prologue, so every such buffer costs its full size on every message
+  regardless of which case runs (and unoptimized builds do not overlap disjoint `case` lifetimes at
+  all). Extract such logic into a helper function instead, like `FileReload`,
+  `BuildResumeFilesMenu`, `ClearAllResumeFiles`, `SaveZoomLevelToINI`.
 
 ## Version Number Management
 

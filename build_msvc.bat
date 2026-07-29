@@ -144,14 +144,18 @@ exit /b 1
 :config_debug
 set OUTPUT=msvc\RichEditor_dbg.exe
 set CFLAGS=/std:c++14 /DUNICODE /D_UNICODE /D_CRT_SECURE_NO_WARNINGS /D_CRT_NON_CONFORMING_WCSTOK /Zi /Od /W3 /MTd /EHsc /DEBUG
-set LDFLAGS=/DEBUG /SUBSYSTEM:WINDOWS /ENTRY:wWinMainCRTStartup
+REM /STACK: 8 MB reserve — startup call chain nests many EXTENDED_PATH_MAX
+REM (~64 KB) stack buffers and exceeds link.exe's 1 MB default (stack overflow
+REM crash on launch); matches the MinGW build's explicit --stack value.
+set LDFLAGS=/DEBUG /SUBSYSTEM:WINDOWS /ENTRY:wWinMainCRTStartup /STACK:8388608
 echo Building DEBUG version...
 goto :config_done
 
 :config_release
 set OUTPUT=msvc\RichEditor.exe
 set CFLAGS=/std:c++14 /DUNICODE /D_UNICODE /D_CRT_SECURE_NO_WARNINGS /D_CRT_NON_CONFORMING_WCSTOK /O1 /GL /W3 /MT /GS- /GR- /Zc:inline /Zc:threadSafeInit- /EHsc /DNDEBUG
-set LDFLAGS=/LTCG /OPT:REF /OPT:ICF /SUBSYSTEM:WINDOWS /ENTRY:wWinMainCRTStartup
+REM /STACK: see debug config comment above (8 MB reserve, startup overflow fix)
+set LDFLAGS=/LTCG /OPT:REF /OPT:ICF /SUBSYSTEM:WINDOWS /ENTRY:wWinMainCRTStartup /STACK:8388608
 echo Building RELEASE version (size-optimized)...
 goto :config_done
 

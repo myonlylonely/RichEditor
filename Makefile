@@ -50,8 +50,12 @@ CFLAGS = -std=c++11 -DUNICODE -D_UNICODE -Os -g -Wall -Wextra \
 # -Wl,--gc-sections : remove unreferenced sections prepared by -ffunction-sections
 # -flto -Os : LTO at size-optimized level (must match CFLAGS -Os)
 # -fno-exceptions : must also appear at link time for LTO to honour it
+# --stack: 8 MB reserve. Many functions use EXTENDED_PATH_MAX (~64 KB) stack
+# buffers; the startup call chain nests enough of them to exceed MSVC's 1 MB
+# default reserve (MinGW's 2 MB default only narrowly avoided it). Keep both
+# toolchains at the same explicit value. Reserve costs address space only.
 LDFLAGS = -mwindows -municode -static -static-libgcc -static-libstdc++ \
-          -Wl,--gc-sections -flto -Os -fno-exceptions
+          -Wl,--gc-sections -Wl,--stack,8388608 -flto -Os -fno-exceptions
 LIBS = -lcomctl32 -lcomdlg32 -lole32 -loleaut32 -lshell32 -lshlwapi -lversion -loleacc -lwinmm
 
 # Default target (debug build)

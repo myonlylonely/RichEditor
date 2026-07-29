@@ -787,6 +787,8 @@ void ShowTemplatePickerMenu(HWND hwnd);
 void BuildTemplateMenu(HWND hwnd);
 void BuildFileNewMenu(HWND hwnd);
 void BuildResumeFilesMenu(HWND hwnd);
+void ClearAllResumeFiles(HWND hwnd);
+void SaveZoomLevelToINI();
 
 // Autocorrection system functions
 void LoadAutocorrectionTables();
@@ -3641,35 +3643,8 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
                     break;
                 }
                 case ID_FILE_OPENRESUME_CLEAR:
-                {
-                    // If currently editing a resumed file, save or discard it first.
-                    if (g_bIsResumedFile && !PromptSaveChanges()) break;
-                    WCHAR szDir[EXTENDED_PATH_MAX];
-                    if (GetRichEditorTempDir(szDir, EXTENDED_PATH_MAX)) {
-                        // Delete every file in the directory (all are RichEditor-managed).
-                        WCHAR szPattern[EXTENDED_PATH_MAX];
-                        _snwprintf(szPattern, EXTENDED_PATH_MAX, L"%s*", szDir);
-                        szPattern[EXTENDED_PATH_MAX - 1] = L'\0';
-                        WIN32_FIND_DATA wfd;
-                        HANDLE hFind = FindFirstFile(szPattern, &wfd);
-                        if (hFind != INVALID_HANDLE_VALUE) {
-                            do {
-                                if (wcscmp(wfd.cFileName, L".") == 0 ||
-                                    wcscmp(wfd.cFileName, L"..") == 0) continue;
-                                if (wfd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) continue;
-                                WCHAR szFull[EXTENDED_PATH_MAX];
-                                _snwprintf(szFull, EXTENDED_PATH_MAX, L"%s%s",
-                                           szDir, wfd.cFileName);
-                                szFull[EXTENDED_PATH_MAX - 1] = L'\0';
-                                DeleteFile(szFull);
-                            } while (FindNextFile(hFind, &wfd));
-                            FindClose(hFind);
-                        }
-                        ClearResumeFromINI();
-                        BuildResumeFilesMenu(hwnd);
-                    }
+                    ClearAllResumeFiles(hwnd);
                     break;
-                }
                 case ID_FILE_RELOAD:
                     FileReload();
                     break;
@@ -4502,18 +4477,7 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
             // Release TOM interface
             if (g_pTextDoc) { g_pTextDoc->Release(); g_pTextDoc = NULL; }
             // Save current zoom level before flushing INI
-            {
-                WCHAR szIniPath[EXTENDED_PATH_MAX];
-                GetINIFilePath(szIniPath, EXTENDED_PATH_MAX);
-                DWORD nNum = 0, nDen = 0;
-                BOOL bZoomed = (BOOL)SendMessage(g_hWndEdit, EM_GETZOOM, (WPARAM)&nNum, (LPARAM)&nDen);
-                int zoomPct = 100;
-                if (bZoomed && nNum > 0 && nDen > 0)
-                    zoomPct = MulDiv((int)nNum, 100, (int)nDen);
-                WCHAR szZoom[16];
-                _snwprintf(szZoom, 16, L"%d", zoomPct);
-                WriteINIValue(szIniPath, L"Settings", L"Zoom", szZoom);
-            }
+            SaveZoomLevelToINI();
             FlushIniCache();
             PostQuitMessage(0);
             return 0;
@@ -12348,6 +12312,69 @@ void AddToMRU(LPCWSTR pszFilePath)
     
     // Update menu
     UpdateMRUMenu(g_hWndMain);
+}
+
+//============================================================================
+// ClearAllResumeFiles - Delete every file in GetRichEditorTempDir() and clear
+// the [Resume] INI entry. Extracted out of WndProc's WM_COMMAND switch (was
+// declared inline with 3 EXTENDED_PATH_MAX / ~64 KB stack buffers, which,
+// combined with other large inline buffers elsewhere in the same giant
+// switch statement, could overflow the stack in unoptimized/debug builds —
+// MSVC does not reuse stack slots across mutually-exclusive case blocks the
+// way an optimizing release build does, so every such buffer's size is
+// effectively summed into WndProc's single stack frame regardless of which
+// case actually executes).
+//============================================================================
+void ClearAllResumeFiles(HWND hwnd)
+{
+    // If currently editing a resumed file, save or discard it first.
+    if (g_bIsResumedFile && !PromptSaveChanges()) return;
+    WCHAR szDir[EXTENDED_PATH_MAX];
+    if (GetRichEditorTempDir(szDir, EXTENDED_PATH_MAX)) {
+        // Delete every file in the directory (all are RichEditor-managed).
+        WCHAR szPattern[EXTENDED_PATH_MAX];
+        _snwprintf(szPattern, EXTENDED_PATH_MAX, L"%s*", szDir);
+        szPattern[EXTENDED_PATH_MAX - 1] = L'\0';
+        WIN32_FIND_DATA wfd;
+        HANDLE hFind = FindFirstFile(szPattern, &wfd);
+        if (hFind != INVALID_HANDLE_VALUE) {
+            do {
+                if (wcscmp(wfd.cFileName, L".") == 0 ||
+                    wcscmp(wfd.cFileName, L"..") == 0) continue;
+                if (wfd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) continue;
+                WCHAR szFull[EXTENDED_PATH_MAX];
+                _snwprintf(szFull, EXTENDED_PATH_MAX, L"%s%s",
+                           szDir, wfd.cFileName);
+                szFull[EXTENDED_PATH_MAX - 1] = L'\0';
+                DeleteFile(szFull);
+            } while (FindNextFile(hFind, &wfd));
+            FindClose(hFind);
+        }
+        ClearResumeFromINI();
+        BuildResumeFilesMenu(hwnd);
+    }
+}
+
+//============================================================================
+// SaveZoomLevelToINI - Persist the current RichEdit zoom percentage to the
+// [Settings] Zoom= key. Extracted out of WndProc's WM_DESTROY handler for the
+// same reason as ClearAllResumeFiles (see its comment): an EXTENDED_PATH_MAX
+// stack buffer declared inline in a WndProc case block permanently occupies
+// space in WndProc's stack frame in unoptimized/debug builds, regardless of
+// whether that case ever executes.
+//============================================================================
+void SaveZoomLevelToINI()
+{
+    WCHAR szIniPath[EXTENDED_PATH_MAX];
+    GetINIFilePath(szIniPath, EXTENDED_PATH_MAX);
+    DWORD nNum = 0, nDen = 0;
+    BOOL bZoomed = (BOOL)SendMessage(g_hWndEdit, EM_GETZOOM, (WPARAM)&nNum, (LPARAM)&nDen);
+    int zoomPct = 100;
+    if (bZoomed && nNum > 0 && nDen > 0)
+        zoomPct = MulDiv((int)nNum, 100, (int)nDen);
+    WCHAR szZoom[16];
+    _snwprintf(szZoom, 16, L"%d", zoomPct);
+    WriteINIValue(szIniPath, L"Settings", L"Zoom", szZoom);
 }
 
 //============================================================================
